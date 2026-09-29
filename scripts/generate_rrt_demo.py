@@ -2,6 +2,11 @@ from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 import math
 import random
+import sys
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
 from planners.geometric_rrt import (
     default_obstacles,
@@ -9,7 +14,6 @@ from planners.geometric_rrt import (
     steer,
 )
 
-ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "assets" / "rrt-replanning-demo.gif"
 OUT.parent.mkdir(parents=True, exist_ok=True)
 
