@@ -67,7 +67,7 @@ The original experiments used a 10 x 10 environment with rotated square obstacle
 
 ## 3. Online replanning
 
-`planners/online_rrt.py` extends the geometric planner to a partially observed occupancy map.
+`planners/online_replanning.py` extends the geometric planner to a partially observed occupancy map.
 
 Unknown cells are treated optimistically as traversable. As sensing reveals occupied cells, the map is updated and the path can be validated and replanned.
 
@@ -92,7 +92,7 @@ The project used TurtleBot-like limits of approximately **0.25 m/s** linear velo
 
 ## 5. ROS 2 TurtleBot integration
 
-`ros2/turtlebot_rrt_node.py` adapts RRT to a TurtleBot-style ROS 2 stack.
+`ros2/turtlebot_rrt_planner.py` adapts RRT to a TurtleBot-style ROS 2 stack.
 
 The node:
 
@@ -117,7 +117,7 @@ pip install -r requirements.txt
 
 python planners/grid_search.py
 python planners/geometric_rrt.py
-python planners/online_rrt.py
+python planners/online_replanning.py
 python planners/kinodynamic_rrt.py
 ```
 
