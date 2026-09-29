@@ -4,6 +4,12 @@ A compact robotics planning project covering **graph search, geometric RRT, kino
 
 The project started as coursework in *Sensing, Planning, and Control in Robotics* at Washington University in St. Louis and was reorganized here as a focused motion-planning portfolio project.
 
+## Demo
+
+![RRT planning and replanning demo](assets/rrt-replanning-demo.gif)
+
+The animation is generated from the same collision checking, steering, obstacle model, and planning assumptions used by the repository. It first grows a geometric RRT, then reveals an obstacle on the planned route and replans against the updated map.
+
 ## What is implemented
 
 - **Grid-based shortest-path planning** with obstacle-aware discretization
@@ -31,14 +37,16 @@ The progression is intentional: start with discrete graph search, move to sampli
 ├── planners/
 │   ├── grid_search.py
 │   ├── geometric_rrt.py
-│   ├── online_rrt.py
+│   ├── online_replanning.py
 │   └── kinodynamic_rrt.py
 ├── ros2/
-│   └── turtlebot_rrt_node.py
+│   └── turtlebot_rrt_planner.py
 ├── tests/
 │   └── test_planners.py
 ├── docs/
 │   └── design-notes.md
+├── scripts/
+│   └── generate_rrt_demo.py
 ├── .github/workflows/ci.yml
 ├── requirements.txt
 └── README.md
