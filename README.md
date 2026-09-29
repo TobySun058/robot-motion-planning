@@ -1,149 +1,156 @@
 # Robot Motion Planning
 
-A compact robotics planning codebase spanning **grid search, geometric RRT, kinodynamic RRT, partial-map planning, and ROS 2 TurtleBot navigation**.
+A compact robotics planning project covering **graph search, geometric RRT, kinodynamic RRT, online replanning, and ROS 2 TurtleBot integration**.
 
-The project grew from a sequence of planning and control assignments into a final TurtleBot navigation prototype. This repository reorganizes that work around the algorithms themselves rather than course/homework file names.
+The project started as coursework in *Sensing, Planning, and Control in Robotics* at Washington University in St. Louis and was reorganized here as a focused motion-planning portfolio project.
 
 ## What is implemented
 
-| Planner | State | Environment knowledge | Main idea |
-| --- | --- | --- | --- |
-| Label-correcting search | grid cell | known occupancy grid | shortest path on a 4-connected graph |
-| Geometric RRT | `(x, y)` | known obstacles | sample, nearest, steer, edge collision check |
-| Optimistic partial-map RRT | `(x, y)` | partially observed | unknown cells treated as free until sensed |
-| Kinodynamic RRT | `(x, y, theta)` | known obstacles | choose from finite differential-drive controls |
-| ROS 2 TurtleBot RRT | `(x, y)` + live map | online occupancy grid | plan, publish waypoints, revalidate, replan |
+- **Grid-based shortest-path planning** with obstacle-aware discretization
+- **Geometric RRT** for a disk robot among rotated obstacles
+- **Online RRT replanning** with a partially observed occupancy map
+- **Kinodynamic RRT** for differential-drive dynamics with a finite control set
+- **ROS 2 TurtleBot planner node** using odometry, occupancy-grid mapping, and waypoint goals
 
 ## Planning progression
 
 ```mermaid
 flowchart LR
-    A[Grid search] --> B[Geometric RRT]
-    B --> C[Partial occupancy map]
-    B --> D[Kinodynamic RRT]
-    C --> E[ROS 2 TurtleBot]
-    D --> E
-    E --> F[Online map updates + replanning]
+    G[Grid Search] --> R[Geometric RRT]
+    R --> O[Online Replanning]
+    O --> K[Kinodynamic RRT]
+    K --> T[ROS 2 TurtleBot]
 ```
 
-The final robotics setup uses a TurtleBot3 Waffle Pi operating in an initially unknown, obstacle-cluttered environment. The planner consumes mapping updates, treats unknown space optimistically, and replans when newly observed occupied cells invalidate the remaining route.
-
-## Representative demos
-
-### Geometric RRT
-
-![Geometric RRT](assets/geometric_rrt.webp)
-
-A goal-biased RRT expands in continuous 2D space and collision-checks candidate edges against rotated obstacles while accounting for the robot radius.
-
-### Kinodynamic RRT
-
-![Kinodynamic RRT](assets/kinodynamic_rrt.webp)
-
-The kinodynamic variant plans in `(x, y, theta)` and expands the tree using short differential-drive control primitives `(v, omega)` rather than straight-line steering.
-
-### Grid planning
-
-![Grid search](assets/grid_search.webp)
-
-The discrete baseline uses label correction on a 4-connected occupancy grid, illustrating the resolution-vs-computation trade-off that motivates continuous sampling-based planning.
+The progression is intentional: start with discrete graph search, move to sampling-based planning in continuous space, add partial observability and replanning, then enforce differential-drive motion constraints and connect the planner to a robot stack.
 
 ## Repository structure
 
 ```text
 .
-├── src/robot_motion_planning/
-│   ├── environment.py          geometry and collision checking
-│   ├── grid_search.py          label-correcting shortest path
-│   ├── geometric_rrt.py        reusable geometric RRT core
-│   ├── kinodynamic_rrt.py      differential-drive RRT
-│   ├── partial_map.py          optimistic occupancy representation
-│   └── visualization.py
-├── examples/
-│   ├── grid_search_demo.py
-│   ├── geometric_rrt_demo.py
-│   ├── kinodynamic_rrt_demo.py
-│   └── partial_map_rrt_demo.py
+├── planners/
+│   ├── grid_search.py
+│   ├── geometric_rrt.py
+│   ├── online_rrt.py
+│   └── kinodynamic_rrt.py
 ├── ros2/
-│   └── turtlebot_rrt_node.py   occupancy-grid planning + replanning
+│   └── turtlebot_rrt_node.py
 ├── tests/
+│   └── test_planners.py
 ├── docs/
-└── assets/
+│   └── design-notes.md
+├── .github/workflows/ci.yml
+├── requirements.txt
+└── README.md
 ```
 
+## 1. Grid search
+
+`planners/grid_search.py` implements a label-correcting shortest-path method on an occupancy grid.
+
+The original grid experiment modeled a disk robot moving through a cluttered 10 x 10 workspace. This deterministic baseline establishes the graph-search formulation before moving to continuous planning.
+
+## 2. Geometric RRT
+
+`planners/geometric_rrt.py` implements Rapidly-exploring Random Trees in continuous 2-D space.
+
+Key pieces:
+
+- goal-biased sampling;
+- nearest-neighbor selection;
+- fixed-step steering;
+- collision checking along edges;
+- disk-robot collision margins;
+- parent-based path reconstruction.
+
+The original experiments used a 10 x 10 environment with rotated square obstacles and a disk robot of radius 0.5 m.
+
+## 3. Online replanning
+
+`planners/online_rrt.py` extends the geometric planner to a partially observed occupancy map.
+
+Unknown cells are treated optimistically as traversable. As sensing reveals occupied cells, the map is updated and the path can be validated and replanned.
+
+```text
+plan -> move -> sense -> update map -> validate path -> replan if needed
+```
+
+## 4. Kinodynamic RRT
+
+`planners/kinodynamic_rrt.py` plans in `(x, y, theta)` using differential-drive dynamics.
+
+Instead of steering directly toward a sample, it:
+
+1. samples a target state;
+2. finds the nearest tree state;
+3. propagates a finite set of `(v, omega)` controls;
+4. chooses the rollout ending closest to the sample;
+5. collision-checks the propagated trajectory;
+6. stores the feasible state and the applied control.
+
+The project used TurtleBot-like limits of approximately **0.25 m/s** linear velocity and **1.82 rad/s** angular velocity.
+
+## 5. ROS 2 TurtleBot integration
+
+`ros2/turtlebot_rrt_node.py` adapts RRT to a TurtleBot-style ROS 2 stack.
+
+The node:
+
+- subscribes to `/odom`;
+- subscribes to `/map` as an `OccupancyGrid`;
+- converts occupied cells to world coordinates;
+- plans RRT paths against the current map;
+- validates the remaining path;
+- replans when newly mapped obstacles invalidate it;
+- publishes waypoint goals to `/goal_pose`.
+
+Robot bring-up, SLAM, and Nav2 launching are intentionally kept outside the planner node instead of being hard-coded to specific machines or IP addresses.
+
 ## Quick start
+
+For the standalone planners:
 
 ```bash
 python -m venv .venv
 source .venv/bin/activate
-pip install -e ".[dev]"
-```
+pip install -r requirements.txt
 
-Run the algorithm demos:
-
-```bash
-python examples/grid_search_demo.py
-python examples/geometric_rrt_demo.py
-python examples/kinodynamic_rrt_demo.py
-python examples/partial_map_rrt_demo.py
+python planners/grid_search.py
+python planners/geometric_rrt.py
+python planners/online_rrt.py
+python planners/kinodynamic_rrt.py
 ```
 
 Run tests:
 
 ```bash
-pytest -q
+pytest
 ```
 
-## ROS 2 TurtleBot node
+ROS 2 dependencies are not installed through `requirements.txt`; run the TurtleBot node inside an existing ROS 2 environment.
 
-`ros2/turtlebot_rrt_node.py` is the cleaned version of the final robot prototype. It:
+## Design choices
 
-- subscribes to `/odom` and `/map`;
-- inflates occupied cells by the robot radius;
-- plans through unknown cells optimistically;
-- publishes intermediate waypoints to `/goal_pose`;
-- rechecks the remaining route after map updates;
-- replans from the current position when the route becomes invalid.
+**Robot footprint.** Collision checking treats the robot as a disk, so obstacle checks include robot radius rather than treating the robot as a point.
 
-Example after installing the core package in a ROS 2 environment:
+**Edge validation.** RRT edges are sampled at intermediate points. This avoids accepting an edge whose endpoints are safe but whose interior crosses an obstacle.
 
-```bash
-python ros2/turtlebot_rrt_node.py --ros-args \
-  -p goal_x:=2.0 \
-  -p goal_y:=2.0
-```
+**Goal bias.** The RRT variants occasionally sample the goal region to improve convergence while preserving exploration.
 
-The public version intentionally removes lab-machine IP addresses and startup assumptions from the original prototype. Robot bring-up, SLAM, and Nav2 should be launched through the user's ROS 2 environment.
+**Unknown space.** The online planner uses an optimistic assumption for unknown cells, then replans when sensing reveals a conflict. This is deliberately simple and is not a belief-space planner.
 
-## Design notes
+## Course context
 
-### Geometric collision checking
-
-The static examples use five rotated square obstacles. Candidate edges are sampled along the segment, and each point is checked against the obstacle geometry after inflating for a disk-shaped robot.
-
-### Kinodynamic steering
-
-For each random state sample, the planner evaluates a finite set of controls bounded by the TurtleBot differential-drive limits used in the original project. Each control is propagated for a short horizon, and the reachable state closest to the sample is selected before collision checking.
-
-### Unknown environments
-
-The partial-map representation uses three states:
-
-- `-1`: unknown
-- `0`: observed free
-- `1`: observed occupied
-
-Planning is optimistic over unknown space. In a live system, new sensing can invalidate a planned segment; the ROS 2 node detects that condition and triggers a new RRT.
-
-## Project context
-
-This work was developed in **ESE 4450: Sensing, Planning, and Control in Robotics** at Washington University in St. Louis. The original project progressed from discrete planning and continuous RRT to kinodynamic planning and a TurtleBot3 implementation in an unknown environment.
-
-The repository is a cleaned technical portfolio version: assignment filenames, duplicated plotting code, machine-specific configuration, and lab-network details have been removed while preserving the planning methods and robot integration.
+The original assignments asked for planning in cluttered environments with a TurtleBot 3 Waffle Pi, including geometric and kinodynamic RRT, replanning in unknown environments, Gazebo validation, and a real-robot demonstration. The code here has been renamed and reorganized around the underlying planning ideas rather than assignment numbers.
 
 ## Limitations
 
-- RRT is probabilistically complete but not optimal; this implementation is not RRT*.
-- The synthetic partial-map demo is intentionally simple and is not a full SLAM simulator.
-- The ROS 2 node assumes an external mapping/navigation stack provides `/map`, `/odom`, and accepts `/goal_pose`.
-- Dynamic-obstacle handling is reactive replanning from updated occupancy data, not prediction of obstacle motion.
+- nearest-neighbor lookup is linear in the number of RRT nodes;
+- collision checking is sampling-based rather than exact continuous collision detection;
+- the online planner uses a simple optimistic unknown-space policy;
+- the ROS 2 integration publishes waypoint goals rather than replacing the lower-level navigation controller;
+- this is a research/course project, not a production navigation stack.
+
+## Future work
+
+This project also motivates my current research interest in using nonlinear minimum-energy steering as a local steering primitive inside sampling-based planners such as RRT*.
