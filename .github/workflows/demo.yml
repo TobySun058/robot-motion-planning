@@ -21,7 +21,7 @@ jobs:
         with:
           python-version: "3.11"
       - run: pip install pillow
-      - run: python scripts/generate_rrt_demo.py
+      - run: PYTHONPATH=. python scripts/generate_rrt_demo.py
       - name: Commit generated demo
         run: |
           git config user.name "github-actions[bot]"
